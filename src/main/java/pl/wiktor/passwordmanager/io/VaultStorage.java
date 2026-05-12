@@ -36,4 +36,13 @@ public class VaultStorage {
             throw e;
         }
     }
+
+    public VaultEnvelope read(Path vaultPath) throws IOException {
+        Path absoluteVaultPath = vaultPath.toAbsolutePath();
+
+        if (!Files.isReadable(absoluteVaultPath))
+            throw new IOException("Vault file is not readable " + absoluteVaultPath);
+
+        return mapper.readValue(absoluteVaultPath.toFile(), VaultEnvelope.class);
+    }
 }

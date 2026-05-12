@@ -52,6 +52,19 @@ class VaultStorageTest {
         assertEquals("existing vault", Files.readString(vaultPath, StandardCharsets.UTF_8));
     }
 
+    @Test
+    void shouldReadVaultEnvelope() throws Exception {
+        VaultStorage storage = new VaultStorage(mapper);
+        Path vaultPath = tempDir.resolve("vault.json");
+        VaultEnvelope envelope = testEnvelope();
+
+        storage.writeNew(vaultPath, envelope);
+
+        VaultEnvelope readEnvelope = storage.read(vaultPath);
+
+        assertEquals(envelope, readEnvelope);
+    }
+
     private VaultEnvelope testEnvelope() {
         Instant now = Instant.parse("2026-05-11T12:00:00Z");
         return new VaultEnvelope(
