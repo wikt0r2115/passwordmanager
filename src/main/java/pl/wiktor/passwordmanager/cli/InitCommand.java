@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.concurrent.Callable;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,26 +17,46 @@ import pl.wiktor.passwordmanager.io.VaultStorage;
 import pl.wiktor.passwordmanager.model.VaultEnvelope;
 import pl.wiktor.passwordmanager.vault.VaultInitializationService;
 
-@Command(name = "init", description = "initializes new password vault")
+@Command(name = "init", description = "Initializes a new password vault")
 public class InitCommand implements Callable<Integer> {
+    interface PasswordReader {
+        char[] readPassword(String prompt);
+    }
+
+    private final ObjectMapper mapper;
+    private final Path vaultPath;
+    private final PasswordReader passwordReader;
+
+    public InitCommand() {
+        this(ObjectMapperFactory.create(), VaultPathResolver.getDefaultVaultPath(), null);
+    }
+
+    InitCommand(ObjectMapper mapper, Path vaultPath, PasswordReader passwordReader) {
+        this.mapper = mapper;
+        this.vaultPath = vaultPath;
+        this.passwordReader = passwordReader;
+    }
+
     @Override
     public Integer call() {
-        ObjectMapper mapper = ObjectMapperFactory.create();
-
-        Path defaultVaultPath = VaultPathResolver.getDefaultVaultPath();
-        if (Files.exists(defaultVaultPath)) {
-            System.err.println("Vault already exists: " + defaultVaultPath);
+        if (Files.exists(vaultPath)) {
+            System.err.println("Vault already exists: " + vaultPath);
             return 2;
         }
 
-        Console console = System.console();
-
-        if (console == null) {
-            System.err.println("Console is unavailable. Run this command from a terminal.");
+        char[] masterPassword;
+        try {
+            masterPassword = readMasterPassword();
+        } catch (IllegalStateException e) {
+            System.err.println(e.getMessage());
             return 1;
         }
 
-        char[] masterPassword = console.readPassword("Type master password: ");
+        if (masterPassword == null) {
+            System.err.println("Master password was not provided.");
+            return 1;
+        }
+
         VaultInitializationService vaultInitializationService = new VaultInitializationService();
 
         try {
@@ -43,11 +64,11 @@ public class InitCommand implements Callable<Integer> {
             VaultStorage vaultStorage = new VaultStorage(mapper);
 
             System.out.println("Initializing vault...");
-            vaultStorage.writeNew(defaultVaultPath, envelope);
-            System.out.println("Vault created: " + defaultVaultPath);
+            vaultStorage.writeNew(vaultPath, envelope);
+            System.out.println("Vault created: " + vaultPath);
             return 0;
         } catch (FileAlreadyExistsException e) {
-            System.err.println("Vault already exists: " + defaultVaultPath);
+            System.err.println("Vault already exists: " + vaultPath);
             return 2;
         } catch (IOException e) {
             System.err.println("Vault could not be written: " + e.getMessage());
@@ -55,6 +76,22 @@ public class InitCommand implements Callable<Integer> {
         } catch (RuntimeException e) {
             System.err.println("Vault initialization failed: " + e.getMessage());
             return 1;
+        } finally {
+            if (masterPassword != null) {
+                Arrays.fill(masterPassword, '\0');
+            }
         }
+    }
+
+    private char[] readMasterPassword() {
+        if (passwordReader != null) {
+            return passwordReader.readPassword("Type master password: ");
+        }
+
+        Console console = System.console();
+        if (console == null) {
+            throw new IllegalStateException("Console is unavailable. Run this command from a terminal.");
+        }
+        return console.readPassword("Type master password: ");
     }
 }

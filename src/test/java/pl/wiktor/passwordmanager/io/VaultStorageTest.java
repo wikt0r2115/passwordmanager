@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Instant;
 
@@ -65,6 +66,30 @@ class VaultStorageTest {
         assertEquals(envelope, readEnvelope);
     }
 
+    @Test
+    void shouldReplaceExistingVaultFile() throws Exception {
+        VaultStorage storage = new VaultStorage(mapper);
+        Path vaultPath = tempDir.resolve("vault.json");
+        VaultEnvelope initialEnvelope = testEnvelope();
+        VaultEnvelope replacementEnvelope = replacementEnvelope();
+
+        storage.writeNew(vaultPath, initialEnvelope);
+        storage.writeReplace(vaultPath, replacementEnvelope);
+
+        VaultEnvelope readEnvelope = storage.read(vaultPath);
+
+        assertEquals(replacementEnvelope, readEnvelope);
+    }
+
+    @Test
+    void shouldNotReplaceMissingVaultFile() {
+        VaultStorage storage = new VaultStorage(mapper);
+        Path vaultPath = tempDir.resolve("vault.json");
+
+        assertThrows(NoSuchFileException.class, () -> storage.writeReplace(vaultPath, testEnvelope()));
+        assertTrue(Files.notExists(vaultPath));
+    }
+
     private VaultEnvelope testEnvelope() {
         Instant now = Instant.parse("2026-05-11T12:00:00Z");
         return new VaultEnvelope(
@@ -75,5 +100,18 @@ class VaultStorageTest {
                 new KdfParams("argon2id", 19456, 2, 1, "salt-base64"),
                 new CipherParams("AES-256-GCM", "nonce-base64", 128),
                 "payload-base64");
+    }
+
+    private VaultEnvelope replacementEnvelope() {
+        Instant createdAt = Instant.parse("2026-05-11T12:00:00Z");
+        Instant updatedAt = Instant.parse("2026-05-12T12:00:00Z");
+        return new VaultEnvelope(
+                "passwordmanager-vault",
+                1,
+                createdAt,
+                updatedAt,
+                new KdfParams("argon2id", 19456, 2, 1, "salt-base64"),
+                new CipherParams("AES-256-GCM", "new-nonce-base64", 128),
+                "new-payload-base64");
     }
 }

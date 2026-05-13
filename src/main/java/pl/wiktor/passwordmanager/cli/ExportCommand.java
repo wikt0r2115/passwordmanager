@@ -8,32 +8,36 @@ import java.util.Arrays;
 import java.util.concurrent.Callable;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import pl.wiktor.passwordmanager.error.CryptoException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
-import pl.wiktor.passwordmanager.model.VaultEntry;
 import pl.wiktor.passwordmanager.model.VaultEnvelope;
 import pl.wiktor.passwordmanager.model.VaultPayload;
 import pl.wiktor.passwordmanager.vault.VaultUnlockService;
 
-@Command(name = "list", description = "Lists password entries")
-public class ListCommand implements Callable<Integer> {
+@Command(name = "export", description = "Exports all entries to a plaintext JSON file")
+public class ExportCommand implements Callable<Integer> {
     interface PasswordReader {
         char[] readPassword(String prompt);
     }
+
+    @Option(names = "--output", required = true, description = "Path to the destination JSON file")
+    private Path outputPath;
 
     private final ObjectMapper mapper;
     private final Path vaultPath;
     private final PasswordReader passwordReader;
 
-    public ListCommand() {
+    public ExportCommand() {
         this(ObjectMapperFactory.create(), VaultPathResolver.getDefaultVaultPath(), null);
     }
 
-    ListCommand(ObjectMapper mapper, Path vaultPath, PasswordReader passwordReader) {
+    ExportCommand(ObjectMapper mapper, Path vaultPath, PasswordReader passwordReader) {
         this.mapper = mapper;
         this.vaultPath = vaultPath;
         this.passwordReader = passwordReader;
@@ -68,32 +72,36 @@ public class ListCommand implements Callable<Integer> {
             return 1;
         }
 
-        VaultUnlockService vaultUnlockService = new VaultUnlockService();
-        VaultPayload vaultPayload;
         try {
-            vaultPayload = vaultUnlockService.unlock(envelope, masterPassword, mapper);
-        } catch (CryptoException e) {
-            System.err.println("Vault unlock failed.");
-            return 1;
-        } catch (IOException e) {
-            System.err.println("Vault payload could not be read: " + e.getMessage());
-            return 1;
+            VaultUnlockService vaultUnlockService = new VaultUnlockService();
+            VaultPayload vaultPayload;
+
+            try {
+                vaultPayload = vaultUnlockService.unlock(envelope, masterPassword, mapper);
+            } catch (CryptoException e) {
+                System.err.println("Vault unlock failed.");
+                return 1;
+            } catch (IOException e) {
+                System.err.println("Vault payload could not be read: " + e.getMessage());
+                return 1;
+            }
+
+            try {
+                // Use a copy of mapper with indentation for better readability of the export
+                ObjectMapper exportMapper = mapper.copy().enable(SerializationFeature.INDENT_OUTPUT);
+                exportMapper.writeValue(outputPath.toFile(), vaultPayload);
+                System.out.println("Export successful: " + outputPath);
+                System.out.println("WARNING: The exported file is plaintext and should be handled securely.");
+                return 0;
+            } catch (IOException e) {
+                System.err.println("Failed to write export file: " + e.getMessage());
+                return 1;
+            }
         } finally {
             if (masterPassword != null) {
                 Arrays.fill(masterPassword, '\0');
             }
         }
-
-        if (vaultPayload.entries().isEmpty()) {
-            System.out.println("No entries found.");
-            return 0;
-        }
-
-        for (VaultEntry entry : vaultPayload.entries()) {
-            System.out.println(entry.name() + "\t" + entry.username() + "\t" + entry.url());
-        }
-
-        return 0;
     }
 
     private char[] readMasterPassword() {

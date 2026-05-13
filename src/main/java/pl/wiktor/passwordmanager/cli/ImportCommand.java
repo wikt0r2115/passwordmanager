@@ -10,30 +10,36 @@ import java.util.concurrent.Callable;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import pl.wiktor.passwordmanager.error.CryptoException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
-import pl.wiktor.passwordmanager.model.VaultEntry;
 import pl.wiktor.passwordmanager.model.VaultEnvelope;
 import pl.wiktor.passwordmanager.model.VaultPayload;
+import pl.wiktor.passwordmanager.vault.VaultEntryService;
+import pl.wiktor.passwordmanager.vault.VaultSaveService;
 import pl.wiktor.passwordmanager.vault.VaultUnlockService;
 
-@Command(name = "list", description = "Lists password entries")
-public class ListCommand implements Callable<Integer> {
+@Command(name = "import", description = "Imports entries from a plaintext JSON file")
+public class ImportCommand implements Callable<Integer> {
     interface PasswordReader {
         char[] readPassword(String prompt);
     }
+
+    @Option(names = "--input", required = true, description = "Path to the source JSON file")
+    private Path inputPath;
 
     private final ObjectMapper mapper;
     private final Path vaultPath;
     private final PasswordReader passwordReader;
 
-    public ListCommand() {
+    public ImportCommand() {
         this(ObjectMapperFactory.create(), VaultPathResolver.getDefaultVaultPath(), null);
     }
 
-    ListCommand(ObjectMapper mapper, Path vaultPath, PasswordReader passwordReader) {
+    @SuppressWarnings("unused")
+    ImportCommand(ObjectMapper mapper, Path vaultPath, PasswordReader passwordReader) {
         this.mapper = mapper;
         this.vaultPath = vaultPath;
         this.passwordReader = passwordReader;
@@ -41,9 +47,22 @@ public class ListCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        if (!Files.exists(inputPath)) {
+            System.err.println("Input file does not exist: " + inputPath);
+            return 1;
+        }
+
         if (!Files.exists(vaultPath)) {
             System.err.println("Vault does not exist: " + vaultPath);
             return 2;
+        }
+
+        VaultPayload importedPayload;
+        try {
+            importedPayload = mapper.readValue(inputPath.toFile(), VaultPayload.class);
+        } catch (IOException e) {
+            System.err.println("Failed to read input file: " + e.getMessage());
+            return 1;
         }
 
         VaultEnvelope envelope;
@@ -68,32 +87,39 @@ public class ListCommand implements Callable<Integer> {
             return 1;
         }
 
-        VaultUnlockService vaultUnlockService = new VaultUnlockService();
-        VaultPayload vaultPayload;
         try {
-            vaultPayload = vaultUnlockService.unlock(envelope, masterPassword, mapper);
-        } catch (CryptoException e) {
-            System.err.println("Vault unlock failed.");
-            return 1;
+            VaultUnlockService vaultUnlockService = new VaultUnlockService();
+            VaultPayload currentPayload;
+
+            try {
+                currentPayload = vaultUnlockService.unlock(
+                        envelope,
+                        Arrays.copyOf(masterPassword, masterPassword.length),
+                        mapper);
+            } catch (CryptoException e) {
+                System.err.println("Vault unlock failed.");
+                return 1;
+            } catch (IOException e) {
+                System.err.println("Vault payload could not be read: " + e.getMessage());
+                return 1;
+            }
+
+            VaultPayload mergedPayload = new VaultEntryService().merge(currentPayload, importedPayload);
+
+            VaultEnvelope newEnvelope = new VaultSaveService()
+                    .save(envelope, mergedPayload, masterPassword, mapper);
+
+            new VaultStorage(mapper).writeReplace(vaultPath, newEnvelope);
+            System.out.println("Import successful. Imported " + importedPayload.entries().size() + " entries.");
+            return 0;
         } catch (IOException e) {
-            System.err.println("Vault payload could not be read: " + e.getMessage());
+            System.err.println("Vault could not be written: " + e.getMessage());
             return 1;
         } finally {
             if (masterPassword != null) {
                 Arrays.fill(masterPassword, '\0');
             }
         }
-
-        if (vaultPayload.entries().isEmpty()) {
-            System.out.println("No entries found.");
-            return 0;
-        }
-
-        for (VaultEntry entry : vaultPayload.entries()) {
-            System.out.println(entry.name() + "\t" + entry.username() + "\t" + entry.url());
-        }
-
-        return 0;
     }
 
     private char[] readMasterPassword() {

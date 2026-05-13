@@ -1,85 +1,72 @@
-# Password Manager
+# Password Manager CLI 🛡️
 
-[English version](README.md)
+Lokalny, bezpieczny menedżer haseł CLI zbudowany w Javie 21. Stworzony dla użytkowników, którzy chcą mieć pełną kontrolę nad swoimi danymi bez polegania na usługach w chmurze.
 
-Lokalny edukacyjny password manager CLI planowany jako kolejny projekt
-portfolio po `studytracker`.
+> **Uwaga:** Jest to projekt edukacyjny. Mimo zastosowania najlepszych praktyk bezpieczeństwa, kod nie przeszedł profesjonalnego audytu.
 
-Repozytorium zawiera obecnie dokumentację, decyzje architektoniczne i pustą
-strukturę projektu. Nie ma jeszcze kodu aplikacji.
+## ✨ Funkcje
 
-## Cel Projektu
+- **Bezpieczne Przechowywanie:** Wszystkie wpisy są zapisane w lokalnie zaszyfrowanym pliku JSON.
+- **Silne Szyfrowanie:** Wykorzystuje AES-256-GCM do szyfrowania danych i Argon2id do wyprowadzania klucza.
+- **Hasło Master:** Twoje hasło główne nigdy nie jest zapisywane – służy wyłącznie do generowania klucza szyfrującego.
+- **Automatyczne Backupy:** Tworzy plik `.bak` automatycznie przed każdą zmianą w sejfie.
+- **Generator Haseł:** Tworzy silne, losowe hasła z możliwością konfiguracji (symbole, cyfry itp.).
+- **Operacje CRUD:** Łatwe dodawanie, listowanie, wyświetlanie, aktualizowanie i usuwanie wpisów.
+- **Eksport/Import:** Backup wpisów do jawnego pliku JSON lub migracja z innych narzędzi.
 
-Celem jest zbudowanie lokalnego vaulta na hasła, który zapisuje dane logowania w
-zaszyfrowanym pliku na komputerze użytkownika. Projekt ma pokazać ostrożne
-projektowanie, testowalność i praktyczne podejście do bezpieczeństwa, ale nie ma
-konkurować z audytowanymi produkcyjnymi password managerami.
+## 🚀 Szybki Start
 
-## Zakres V1
+### Wymagania
+- Java 21 lub nowsza
+- Maven
 
-- Inicjalizacja lokalnego zaszyfrowanego vaulta.
-- Odblokowanie vaulta master passwordem.
-- Dodawanie, listowanie, podgląd i usuwanie wpisów.
-- Generowanie losowych haseł.
-- Zapis jednego lokalnego pliku vaulta.
-- Oddzielenie CLI od domeny, kryptografii i persistence.
+### Instalacja
+1. Sklonuj repozytorium:
+   ```bash
+   git clone https://github.com/TWOJ_USERNAME/passwordmanager.git
+   cd passwordmanager
+   ```
+2. Zbuduj projekt:
+   ```bash
+   mvn clean package
+   ```
+3. Uruchom aplikację:
+   ```bash
+   ./passwordmanager.sh --help
+   ```
 
-## Poza Zakresem V1
+## 🛠️ Komendy
 
-- Rozszerzenie przeglądarki.
-- Synchronizacja z chmurą.
-- GUI.
-- Vault współdzielony albo zespołowy.
-- Integracja ze schowkiem.
-- Sprawdzanie wycieków haseł przez zewnętrzne API.
-- Deklaracje produkcyjnego bezpieczeństwa albo audytu.
+| Komenda | Opis |
+| :--- | :--- |
+| `init` | Inicjalizacja nowego zaszyfrowanego sejfu. |
+| `add` | Dodanie nowego wpisu (obsługuje `--generate`). |
+| `list` | Listowanie nazw i użytkowników wszystkich wpisów. |
+| `show` | Wyświetlenie pełnych danych (w tym hasła) konkretnego wpisu. |
+| `update` | Aktualizacja wpisu (zmiana pól lub rotacja hasła). |
+| `remove` | Stałe usunięcie wpisu. |
+| `export` | Eksport wpisów do jawnego pliku JSON. |
+| `import` | Scalanie wpisów z pliku JSON do aktualnego sejfu. |
+| `generate`| Generowanie silnego losowego hasła. |
 
-## Wybrane Technologie
+## 🔒 Bezpieczeństwo
 
-- Java 21 LTS.
-- Maven.
-- picocli do parsowania komend CLI.
-- Jackson do serializacji JSON.
-- Bouncy Castle do Argon2id.
-- Java Cryptography Architecture do AES-GCM i `SecureRandom`.
-- JUnit 5 do testów.
-- GitHub Actions do CI, gdy zacznie się implementacja.
+Projekt został stworzony z myślą o bezpieczeństwie danych:
 
-Dokumenty projektowe:
+- **Wyprowadzanie Klucza:** Argon2id (Bouncy Castle) chroni przed atakami brute-force i słownikowymi.
+- **Szyfrowanie:** AES-256 w trybie GCM zapewnia poufność oraz autentyczność danych (AEAD).
+- **AAD (Additional Authenticated Data):** Metadane sejfu (wersja, format) są chronione tagiem autentyczności GCM przed manipulacją.
+- **Bezpieczeństwo Pamięci:** Wrażliwe dane (`char[]`) są jawnie zerowane w pamięci (`Arrays.fill`) po użyciu.
+- **Zapis Atomiczny:** Zmiany są zapisywane przez plik tymczasowy i operację `move`, co zapobiega uszkodzeniu sejfu przy awarii.
 
-- [Research](docs/research.md)
-- [Zakres](docs/scope.md)
-- [Architektura](docs/architecture.md)
-- [Security Design](docs/security-design.md)
-- [Format Vaulta](docs/vault-format.md)
-- [Strategia Testów](docs/testing-strategy.md)
-- [Roadmapa](docs/roadmap.md)
+## 📦 Stack Technologiczny
 
-## Planowany Kształt CLI
+- **Język:** Java 21 (LTS)
+- **Framework CLI:** [picocli](https://picocli.info/)
+- **Kryptografia:** JCA (AES-GCM), Bouncy Castle (Argon2id)
+- **Serializacja JSON:** Jackson
+- **Testy:** JUnit 5
 
-```text
-passwordmanager init
-passwordmanager add <name>
-passwordmanager list
-passwordmanager show <name>
-passwordmanager remove <name>
-passwordmanager generate
-passwordmanager change-master
-```
+## 📄 Licencja
 
-Nazwy komend mogą się jeszcze zmienić podczas implementacji.
-
-## Aktualny Status
-
-```text
-Status: planowanie / sam szkielet
-Kod: jeszcze niezaimplementowany
-```
-
-Następny krok to pierwszy cienki pionowy wycinek:
-
-1. `passwordmanager init`
-2. utworzenie pliku vaulta
-3. prompt o master password
-4. zapis zaszyfrowanego pustego vaulta
-5. testy inicjalizacji vaulta
+Projekt jest dostępny na licencji MIT – szczegóły w pliku [LICENSE](LICENSE).
