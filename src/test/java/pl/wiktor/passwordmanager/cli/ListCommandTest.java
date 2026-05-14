@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -105,6 +106,30 @@ class ListCommandTest {
 
         assertEquals(1, result.exitCode());
         assertTrue(result.stderr().contains("Master password was not provided."));
+    }
+
+    @Test
+    void shouldReturnOneWhenVaultEnvelopeIsInvalid() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        VaultEnvelope envelope = new VaultStorage(mapper).read(vaultPath);
+        VaultEnvelope invalidEnvelope = new VaultEnvelope(
+                envelope.format(),
+                99,
+                envelope.createdAt(),
+                envelope.updatedAt(),
+                envelope.kdf(),
+                envelope.cipher(),
+                envelope.payload());
+        Files.delete(vaultPath);
+        new VaultStorage(mapper).writeNew(vaultPath, invalidEnvelope);
+
+        CommandResult result = executeQuietly(new ListCommand(
+                mapper,
+                vaultPath,
+                prompt -> "test-master-password".toCharArray()));
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stderr().contains("Invalid vault file: Unsupported vault version: 99"));
     }
 
     private Path initializedVaultPath() throws Exception {

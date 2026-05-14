@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import picocli.CommandLine.Command;
 import pl.wiktor.passwordmanager.error.CryptoException;
+import pl.wiktor.passwordmanager.error.VaultValidationException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
@@ -74,6 +75,9 @@ public class ListCommand implements Callable<Integer> {
             vaultPayload = vaultUnlockService.unlock(envelope, masterPassword, mapper);
         } catch (CryptoException e) {
             System.err.println("Vault unlock failed.");
+            return 1;
+        } catch (VaultValidationException e) {
+            System.err.println("Invalid vault file: " + e.getMessage());
             return 1;
         } catch (IOException e) {
             System.err.println("Vault payload could not be read: " + e.getMessage());

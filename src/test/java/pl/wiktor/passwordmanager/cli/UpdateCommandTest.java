@@ -85,6 +85,90 @@ class UpdateCommandTest {
     }
 
     @Test
+    void shouldPromptForNewPasswordDuringUpdate() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        addEntry(vaultPath, "github", "user", "secret");
+
+        int exitCode = executeQuietly(new UpdateCommand(
+                mapper,
+                vaultPath,
+                prompt -> {
+                    if (prompt.contains("new entry password")) {
+                        return "prompted-secret".toCharArray();
+                    }
+                    return "test-master-password".toCharArray();
+                }),
+                "--name", "github",
+                "--prompt-password");
+
+        VaultEnvelope savedEnvelope = new VaultStorage(mapper).read(vaultPath);
+        VaultPayload payload = new VaultUnlockService()
+                .unlock(savedEnvelope, "test-master-password".toCharArray(), mapper);
+        VaultEntry entry = payload.entries().getFirst();
+
+        assertEquals(0, exitCode);
+        assertEquals("prompted-secret", entry.password());
+    }
+
+    @Test
+    void shouldRejectMultiplePasswordSources() throws Exception {
+        Path vaultPath = initializedVaultPath();
+
+        int exitCode = executeQuietly(new UpdateCommand(
+                mapper,
+                vaultPath,
+                prompt -> "test-master-password".toCharArray()),
+                "--name", "github",
+                "--password", "new-secret",
+                "--prompt-password");
+
+        assertEquals(1, exitCode);
+    }
+
+    @Test
+    void shouldRejectWrongMasterPasswordWithoutChangingVault() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        addEntry(vaultPath, "github", "user", "secret");
+        VaultEnvelope initialEnvelope = new VaultStorage(mapper).read(vaultPath);
+
+        int exitCode = executeQuietly(new UpdateCommand(
+                mapper,
+                vaultPath,
+                prompt -> "wrong-password".toCharArray()),
+                "--name", "github",
+                "--password", "new-secret");
+
+        VaultEnvelope envelopeAfterFailedUpdate = new VaultStorage(mapper).read(vaultPath);
+        VaultPayload payload = new VaultUnlockService()
+                .unlock(envelopeAfterFailedUpdate, "test-master-password".toCharArray(), mapper);
+
+        assertEquals(1, exitCode);
+        assertEquals(initialEnvelope, envelopeAfterFailedUpdate);
+        assertEquals("secret", payload.entries().getFirst().password());
+    }
+
+    @Test
+    void shouldFailWhenPromptedPasswordIsNotProvided() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        addEntry(vaultPath, "github", "user", "secret");
+        VaultEnvelope initialEnvelope = new VaultStorage(mapper).read(vaultPath);
+
+        int exitCode = executeQuietly(new UpdateCommand(
+                mapper,
+                vaultPath,
+                prompt -> prompt.contains("new entry password")
+                        ? null
+                        : "test-master-password".toCharArray()),
+                "--name", "github",
+                "--prompt-password");
+
+        VaultEnvelope envelopeAfterFailedUpdate = new VaultStorage(mapper).read(vaultPath);
+
+        assertEquals(1, exitCode);
+        assertEquals(initialEnvelope, envelopeAfterFailedUpdate);
+    }
+
+    @Test
     void shouldFailWhenEntryNotFound() throws Exception {
         Path vaultPath = initializedVaultPath();
 

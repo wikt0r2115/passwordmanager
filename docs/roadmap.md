@@ -2,79 +2,88 @@
 
 ## Fit After `studytracker`
 
-`studytracker` proved the basics:
+`studytracker` covered a simpler Java CLI domain: Maven, tests, storage, CSV, README, CI and basic layered design.
 
-- Java CLI.
-- Maven.
-- tests,
-- storage,
-- CSV,
-- README,
-- CI,
-- simple layered design.
-
-This project is the next step because it keeps the CLI shape familiar but adds:
+This project is the next step because it adds:
 
 - security-sensitive design,
 - encryption at rest,
 - KDF parameter storage,
-- stronger test strategy,
-- CLI framework usage,
-- richer documentation.
+- command framework usage,
+- stronger test coverage,
+- richer documentation and threat-model discussion.
 
-## Milestone 0: Planning
+## Milestone Status
 
-Status: current.
+### Milestone 0: Planning
+
+Status: done.
 
 - Research.
 - Documentation.
-- Empty project structure.
 - Technology choices.
 - Security boundaries.
 
-## Milestone 1: Vault Initialization
+### Milestone 1: Vault Initialization
 
-- Maven wrapper.
-- CI workflow.
+Status: done.
+
 - `init` command.
 - master password prompt.
 - encrypted empty vault file.
-- tests for init and storage failure.
+- tests for init and storage behavior.
 
-## Milestone 2: Basic Entries
+### Milestone 2: Entries
+
+Status: done.
 
 - `add`.
 - `list`.
 - `show`.
+- `update`.
 - `remove`.
-- domain validation.
 - vault round-trip tests.
 
-## Milestone 3: Password Generator
+### Milestone 3: Password Generator
+
+Status: done.
 
 - `generate`.
 - length option.
-- symbols option.
-- clear defaults.
-- tests for generated length and character policy.
+- character-class options.
+- generated password tests.
 
-## Milestone 4: Hardening
+### Milestone 4: Hardening
+
+Status: mostly done for V1.
 
 - wrong password and tampering tests.
-- file permission best effort.
+- vault envelope validation.
+- safer password prompt flows.
 - clearer error messages.
-- README with threat model and disclaimer.
+- explicit security limitations.
 
-## Milestone 5: Portfolio Polish
+Remaining future hardening:
 
-- badges.
-- examples.
-- command screenshots/asciinema.
-- architecture section.
-- security decisions section.
+- POSIX owner-only file permissions for vault and backups.
+- dependency vulnerability scan.
+- static analysis.
+- more filesystem failure simulation.
+
+### Milestone 5: Portfolio Polish
+
+Status: done for V1, with optional polish still possible.
+
+- README.
+- Polish README.
+- architecture docs.
+- security design docs.
+- CI workflow.
+- Maven Wrapper.
+- runnable fat jar and launcher scripts.
 
 ## Explicit Stop Point
 
-Stop after Milestone 5 unless there is a strong reason to continue.
+Stop after V1 polish unless there is a strong reason to continue.
 
 Do not expand into GUI, sync or browser extension in this project version.

@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import pl.wiktor.passwordmanager.error.CryptoException;
+import pl.wiktor.passwordmanager.error.VaultValidationException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
@@ -64,6 +65,10 @@ public class ImportCommand implements Callable<Integer> {
             System.err.println("Failed to read input file: " + e.getMessage());
             return 1;
         }
+        if (importedPayload == null || importedPayload.entries() == null) {
+            System.err.println("Failed to read input file: payload entries are missing.");
+            return 1;
+        }
 
         VaultEnvelope envelope;
         try {
@@ -99,21 +104,28 @@ public class ImportCommand implements Callable<Integer> {
             } catch (CryptoException e) {
                 System.err.println("Vault unlock failed.");
                 return 1;
+            } catch (VaultValidationException e) {
+                System.err.println("Invalid vault file: " + e.getMessage());
+                return 1;
             } catch (IOException e) {
                 System.err.println("Vault payload could not be read: " + e.getMessage());
                 return 1;
             }
 
             VaultPayload mergedPayload = new VaultEntryService().merge(currentPayload, importedPayload);
+            int addedEntries = mergedPayload.entries().size() - currentPayload.entries().size();
 
             VaultEnvelope newEnvelope = new VaultSaveService()
                     .save(envelope, mergedPayload, masterPassword, mapper);
 
             new VaultStorage(mapper).writeReplace(vaultPath, newEnvelope);
-            System.out.println("Import successful. Imported " + importedPayload.entries().size() + " entries.");
+            System.out.println("Import successful. Added " + addedEntries + " entries.");
             return 0;
         } catch (IOException e) {
             System.err.println("Vault could not be written: " + e.getMessage());
+            return 1;
+        } catch (RuntimeException e) {
+            System.err.println("Import failed: " + e.getMessage());
             return 1;
         } finally {
             if (masterPassword != null) {

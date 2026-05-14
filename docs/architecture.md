@@ -2,87 +2,72 @@
 
 ## High-Level Design
 
-The project should stay layered:
+The project uses a small layered structure:
 
 ```text
-CLI -> Application Services -> Domain Model -> Vault Storage -> Crypto
+CLI -> Vault Services -> Domain Model -> Vault Storage -> Crypto
 ```
 
-The CLI layer parses commands and handles terminal input/output. It should not
-know encryption details.
+The CLI layer parses commands, handles terminal input/output and maps failures to exit codes. It does not implement encryption details directly.
 
-The service layer coordinates use cases such as adding an entry or changing the
-master password.
+The vault service layer coordinates use cases such as initialization, unlock, save, add, update, remove and import merge.
 
-The vault storage layer reads and writes the encrypted vault file.
+The storage layer reads and writes the encrypted vault envelope.
 
-The crypto layer derives keys, encrypts payloads and decrypts payloads. It must
-not depend on CLI classes.
+The crypto layer derives keys, encrypts payloads and decrypts payloads. It does not depend on CLI classes.
 
-## Planned Package Structure
+## Package Structure
 
 ```text
 pl.wiktor.passwordmanager
-  cli       command classes and terminal adapters
-  crypto    KDF, AES-GCM, random generation, sensitive value handling
-  error     application exceptions and exit-code mapping
-  io        filesystem paths, atomic writes, permissions checks
-  model     domain objects such as VaultEntry
-  password  generated password policies and generator
-  vault     vault envelope, payload, serialization, repository
+  cli       picocli command classes and terminal password readers
+  crypto    Argon2id, AES-GCM and secure random helpers
+  error     application exceptions
+  io        ObjectMapper setup, vault path resolution and vault storage
+  model     immutable records for vault envelope, payload and entries
+  password  generated password policy and generator
+  vault     vault initialization, unlock, save, AAD, validation and entry service
 ```
 
-## Directory Structure
-
-```text
-passwordmanager/
-  docs/
-  src/main/java/pl/wiktor/passwordmanager/
-  src/test/java/pl/wiktor/passwordmanager/
-  src/test/resources/fixtures/
-  examples/
-  scripts/
-```
-
-The current repository skeleton keeps these directories with `.gitkeep` files
-until actual implementation starts.
-
-## Planned Main Components
+## Main Components
 
 ### CLI
 
 Responsibilities:
 
-- Parse subcommands.
+- Parse subcommands and options.
 - Print user-facing messages.
-- Read master password without echo.
-- Map application errors to exit codes.
+- Read master password and prompted entry passwords without echo.
+- Avoid prompting when a precondition already failed, such as missing vault file.
+- Map application errors to stable exit codes.
 
-### Vault Service
+### Vault Services
 
 Responsibilities:
 
 - Validate use-case inputs.
 - Coordinate load/decrypt/update/encrypt/save flows.
 - Keep decrypted data lifetime short.
+- Validate vault envelope metadata before KDF/decrypt.
 
-### Vault Repository
+### Vault Storage
 
 Responsibilities:
 
 - Locate the vault file.
 - Read JSON envelope.
-- Write JSON envelope atomically.
+- Write JSON envelope through a temporary file and atomic move.
+- Create `.bak` before replacing an existing vault.
 - Avoid corrupting existing data on failed writes.
 
-### Crypto Service
+### Crypto
 
 Responsibilities:
 
-- Derive an encryption key from the master password and vault salt.
+- Derive a 256-bit encryption key from the master password and vault salt.
 - Generate salts, nonces and passwords using `SecureRandom`.
 - Encrypt and decrypt payloads with AES-GCM.
-- Verify authentication failure cleanly for wrong passwords or tampered files.
+- Fail cleanly for wrong passwords or tampered ciphertext.
 
 ### Password Generator
 
@@ -97,10 +82,11 @@ Responsibilities:
 Allowed:
 
 ```text
-cli -> service -> vault -> crypto
-service -> model
-vault -> model
-password -> crypto random source
+cli -> vault/io/model/password/error
+vault -> crypto/model/error
+io -> model
+password -> java.security.SecureRandom
+crypto -> model/error
 ```
 
 Avoid:

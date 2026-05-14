@@ -11,7 +11,10 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import pl.wiktor.passwordmanager.error.CryptoException;
+import pl.wiktor.passwordmanager.error.VaultValidationException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
+import pl.wiktor.passwordmanager.model.CipherParams;
+import pl.wiktor.passwordmanager.model.KdfParams;
 import pl.wiktor.passwordmanager.model.VaultEnvelope;
 import pl.wiktor.passwordmanager.model.VaultPayload;
 
@@ -63,8 +66,57 @@ class VaultUnlockServiceTest {
                 envelope.payload());
         char[] masterPassword = "test-master-password".toCharArray();
 
-        assertThrows(CryptoException.class,
+        assertThrows(VaultValidationException.class,
                 () -> new VaultUnlockService().unlock(tamperedEnvelope, masterPassword, mapper));
+        assertArrayEquals(new char[masterPassword.length], masterPassword);
+    }
+
+    @Test
+    void shouldRejectInvalidBase64SaltBeforeDerivingKey() {
+        VaultEnvelope envelope = createEnvelope();
+        KdfParams invalidKdf = new KdfParams(
+                envelope.kdf().name(),
+                envelope.kdf().memoryKiB(),
+                envelope.kdf().iterations(),
+                envelope.kdf().parallelism(),
+                "not-base64!");
+        VaultEnvelope invalidEnvelope = withKdf(envelope, invalidKdf);
+        char[] masterPassword = "test-master-password".toCharArray();
+
+        assertThrows(VaultValidationException.class,
+                () -> new VaultUnlockService().unlock(invalidEnvelope, masterPassword, mapper));
+        assertArrayEquals(new char[masterPassword.length], masterPassword);
+    }
+
+    @Test
+    void shouldRejectKdfMemoryOutsideSupportedLimits() {
+        VaultEnvelope envelope = createEnvelope();
+        KdfParams invalidKdf = new KdfParams(
+                envelope.kdf().name(),
+                999_999_999,
+                envelope.kdf().iterations(),
+                envelope.kdf().parallelism(),
+                envelope.kdf().salt());
+        VaultEnvelope invalidEnvelope = withKdf(envelope, invalidKdf);
+        char[] masterPassword = "test-master-password".toCharArray();
+
+        assertThrows(VaultValidationException.class,
+                () -> new VaultUnlockService().unlock(invalidEnvelope, masterPassword, mapper));
+        assertArrayEquals(new char[masterPassword.length], masterPassword);
+    }
+
+    @Test
+    void shouldRejectInvalidNonceLength() {
+        VaultEnvelope envelope = createEnvelope();
+        CipherParams invalidCipher = new CipherParams(
+                envelope.cipher().name(),
+                Base64.getEncoder().encodeToString(new byte[3]),
+                envelope.cipher().tagLengthBits());
+        VaultEnvelope invalidEnvelope = withCipher(envelope, invalidCipher);
+        char[] masterPassword = "test-master-password".toCharArray();
+
+        assertThrows(VaultValidationException.class,
+                () -> new VaultUnlockService().unlock(invalidEnvelope, masterPassword, mapper));
         assertArrayEquals(new char[masterPassword.length], masterPassword);
     }
 
@@ -81,6 +133,28 @@ class VaultUnlockServiceTest {
                 envelope.kdf(),
                 envelope.cipher(),
                 payload);
+    }
+
+    private VaultEnvelope withKdf(VaultEnvelope envelope, KdfParams kdf) {
+        return new VaultEnvelope(
+                envelope.format(),
+                envelope.version(),
+                envelope.createdAt(),
+                envelope.updatedAt(),
+                kdf,
+                envelope.cipher(),
+                envelope.payload());
+    }
+
+    private VaultEnvelope withCipher(VaultEnvelope envelope, CipherParams cipher) {
+        return new VaultEnvelope(
+                envelope.format(),
+                envelope.version(),
+                envelope.createdAt(),
+                envelope.updatedAt(),
+                envelope.kdf(),
+                cipher,
+                envelope.payload());
     }
 
     private String tamperBase64(String value) {

@@ -25,6 +25,15 @@ class AppTest {
         assertFalse(result.stdout().contains("unlock"));
     }
 
+    @Test
+    void shouldShowUsageAndReturnOneWhenNoCommandIsProvided() {
+        CommandResult result = executeQuietly();
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stdout().contains("Usage: passwordmanager"));
+        assertTrue(result.stdout().contains("Commands:"));
+    }
+
     private CommandResult executeQuietly(String... args) {
         PrintStream originalOut = System.out;
         PrintStream originalErr = System.err;

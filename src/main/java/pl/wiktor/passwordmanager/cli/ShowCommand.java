@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import pl.wiktor.passwordmanager.error.CryptoException;
+import pl.wiktor.passwordmanager.error.VaultValidationException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
@@ -81,6 +82,9 @@ public class ShowCommand implements Callable<Integer> {
             } catch (CryptoException e) {
                 System.err.println("Vault unlock failed.");
                 return 1;
+            } catch (VaultValidationException e) {
+                System.err.println("Invalid vault file: " + e.getMessage());
+                return 1;
             } catch (IOException e) {
                 System.err.println("Vault payload could not be read: " + e.getMessage());
                 return 1;
@@ -88,8 +92,8 @@ public class ShowCommand implements Callable<Integer> {
 
             List<VaultEntry> entries = vaultPayload.entries();
             if (entries.isEmpty()) {
-                System.out.println("No entries found.");
-                return 0;
+                System.err.println("Entry not found: " + name);
+                return 2;
             }
 
             for (VaultEntry entry : entries) {

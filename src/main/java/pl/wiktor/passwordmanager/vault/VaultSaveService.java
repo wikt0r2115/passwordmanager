@@ -24,6 +24,10 @@ public class VaultSaveService {
         byte[] payloadBytes = null;
 
         try {
+            VaultEnvelopeValidator.validate(oldEnvelope);
+            if (vaultPayload == null || vaultPayload.entries() == null) {
+                throw new IllegalArgumentException("Vault payload entries cannot be null");
+            }
             KdfParams kdf = oldEnvelope.kdf();
 
             byte[] saltBytes = Base64.getDecoder().decode(kdf.salt());

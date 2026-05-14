@@ -64,7 +64,7 @@ class ShowCommandTest {
     }
 
     @Test
-    void shouldReturnZeroWhenVaultHasNoEntries() throws Exception {
+    void shouldReturnTwoWhenVaultHasNoEntries() throws Exception {
         Path vaultPath = initializedVaultPath();
 
         CommandResult result = executeQuietly(new ShowCommand(
@@ -73,8 +73,8 @@ class ShowCommandTest {
                 prompt -> "test-master-password".toCharArray()),
                 "--name", "github");
 
-        assertEquals(0, result.exitCode());
-        assertTrue(result.stdout().contains("No entries found."));
+        assertEquals(2, result.exitCode());
+        assertTrue(result.stderr().contains("Entry not found: github"));
     }
 
     @Test

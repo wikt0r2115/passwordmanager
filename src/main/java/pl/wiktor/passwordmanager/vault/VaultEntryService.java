@@ -73,9 +73,15 @@ public class VaultEntryService {
         if (target == null || source == null) {
             throw new IllegalArgumentException("Target and source payloads cannot be null");
         }
+        if (target.entries() == null || source.entries() == null) {
+            throw new IllegalArgumentException("Target and source entries cannot be null");
+        }
 
         List<VaultEntry> mergedEntries = new ArrayList<>(target.entries());
         for (VaultEntry sourceEntry : source.entries()) {
+            if (sourceEntry == null || sourceEntry.id() == null || sourceEntry.id().isBlank()) {
+                throw new IllegalArgumentException("Imported entries must have non-blank IDs");
+            }
             boolean exists = mergedEntries.stream()
                     .anyMatch(e -> e.id().equals(sourceEntry.id()));
             if (!exists) {

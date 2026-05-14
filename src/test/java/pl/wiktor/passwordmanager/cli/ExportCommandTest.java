@@ -1,6 +1,7 @@
 package pl.wiktor.passwordmanager.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -9,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,18 +39,72 @@ class ExportCommandTest {
         addEntry(vaultPath, "github", "user", "secret");
         Path exportPath = tempDir.resolve("export.json");
 
-        int exitCode = executeQuietly(new ExportCommand(
+        CommandResult result = executeQuietly(new ExportCommand(
                 mapper,
                 vaultPath,
                 prompt -> "test-master-password".toCharArray()),
                 "--output", exportPath.toString());
 
-        assertEquals(0, exitCode);
+        assertEquals(0, result.exitCode());
+        assertTrue(result.stdout().contains("WARNING: The exported file is plaintext"));
         assertTrue(Files.exists(exportPath));
         
         VaultPayload exportedPayload = mapper.readValue(exportPath.toFile(), VaultPayload.class);
         assertEquals(1, exportedPayload.entries().size());
         assertEquals("github", exportedPayload.entries().getFirst().name());
+    }
+
+    @Test
+    void shouldReturnTwoWhenVaultDoesNotExistWithoutPromptingForPassword() {
+        AtomicBoolean passwordPrompted = new AtomicBoolean(false);
+        Path vaultPath = tempDir.resolve("missing-vault.json");
+        Path exportPath = tempDir.resolve("export.json");
+
+        CommandResult result = executeQuietly(new ExportCommand(
+                mapper,
+                vaultPath,
+                prompt -> {
+                    passwordPrompted.set(true);
+                    return "test-master-password".toCharArray();
+                }),
+                "--output", exportPath.toString());
+
+        assertEquals(2, result.exitCode());
+        assertFalse(passwordPrompted.get());
+        assertFalse(Files.exists(exportPath));
+    }
+
+    @Test
+    void shouldRejectWrongMasterPasswordWithoutWritingExportFile() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        addEntry(vaultPath, "github", "user", "secret");
+        Path exportPath = tempDir.resolve("export.json");
+
+        CommandResult result = executeQuietly(new ExportCommand(
+                mapper,
+                vaultPath,
+                prompt -> "wrong-password".toCharArray()),
+                "--output", exportPath.toString());
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stderr().contains("Vault unlock failed."));
+        assertFalse(Files.exists(exportPath));
+    }
+
+    @Test
+    void shouldReturnOneWhenMasterPasswordIsNotProvided() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        Path exportPath = tempDir.resolve("export.json");
+
+        CommandResult result = executeQuietly(new ExportCommand(
+                mapper,
+                vaultPath,
+                prompt -> null),
+                "--output", exportPath.toString());
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stderr().contains("Master password was not provided."));
+        assertFalse(Files.exists(exportPath));
     }
 
     private Path initializedVaultPath() throws Exception {
@@ -73,16 +129,22 @@ class ExportCommandTest {
         storage.writeReplace(vaultPath, newEnvelope);
     }
 
-    private int executeQuietly(ExportCommand command, String... args) {
+    private CommandResult executeQuietly(ExportCommand command, String... args) {
         PrintStream originalOut = System.out;
         PrintStream originalErr = System.err;
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         try {
-            System.setOut(new PrintStream(new ByteArrayOutputStream()));
-            System.setErr(new PrintStream(new ByteArrayOutputStream()));
-            return new CommandLine(command).execute(args);
+            System.setOut(new PrintStream(stdout));
+            System.setErr(new PrintStream(stderr));
+            int exitCode = new CommandLine(command).execute(args);
+            return new CommandResult(exitCode, stdout.toString(), stderr.toString());
         } finally {
             System.setOut(originalOut);
             System.setErr(originalErr);
         }
+    }
+
+    private record CommandResult(int exitCode, String stdout, String stderr) {
     }
 }

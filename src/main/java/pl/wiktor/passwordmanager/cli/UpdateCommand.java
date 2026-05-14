@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import pl.wiktor.passwordmanager.error.CryptoException;
+import pl.wiktor.passwordmanager.error.VaultValidationException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
@@ -38,8 +39,10 @@ public class UpdateCommand implements Callable<Integer> {
     private String newName;
     @Option(names = "--username", description = "New username")
     private String username;
-    @Option(names = "--password", description = "New password")
+    @Option(names = "--password", description = "New password (visible in shell history; prefer --prompt-password)")
     private String password;
+    @Option(names = "--prompt-password", description = "Prompt for the new password without echo")
+    private boolean promptPassword;
     @Option(names = "--url", description = "New URL")
     private String url;
     @Option(names = "--notes", description = "New notes")
@@ -72,13 +75,24 @@ public class UpdateCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        if (newName == null && username == null && password == null && url == null && notes == null && !generate) {
-            System.err.println("Error: Nothing to update. Provide at least one field to change or use --generate.");
+        if (newName == null && username == null && password == null && url == null && notes == null && !generate
+                && !promptPassword) {
+            System.err.println("Error: Nothing to update. Provide at least one field to change, --generate or --prompt-password.");
             return 1;
         }
 
-        if (password != null && generate) {
-            System.err.println("Error: Please provide either --password or --generate, not both.");
+        int passwordSources = 0;
+        if (password != null) {
+            passwordSources++;
+        }
+        if (generate) {
+            passwordSources++;
+        }
+        if (promptPassword) {
+            passwordSources++;
+        }
+        if (passwordSources > 1) {
+            System.err.println("Error: Please provide only one password source: --password, --generate or --prompt-password.");
             return 1;
         }
 
@@ -121,6 +135,9 @@ public class UpdateCommand implements Callable<Integer> {
             } catch (CryptoException e) {
                 System.err.println("Vault unlock failed.");
                 return 1;
+            } catch (VaultValidationException e) {
+                System.err.println("Invalid vault file: " + e.getMessage());
+                return 1;
             } catch (IOException e) {
                 System.err.println("Vault payload could not be read: " + e.getMessage());
                 return 1;
@@ -147,6 +164,24 @@ public class UpdateCommand implements Callable<Integer> {
                 } catch (IllegalArgumentException e) {
                     System.err.println("Password generation failed: " + e.getMessage());
                     return 1;
+                }
+            }
+            if (promptPassword) {
+                char[] entryPassword = null;
+                try {
+                    entryPassword = readEntryPassword();
+                } catch (IllegalStateException e) {
+                    System.err.println(e.getMessage());
+                    return 1;
+                }
+                if (entryPassword == null) {
+                    System.err.println("Entry password was not provided.");
+                    return 1;
+                }
+                try {
+                    effectivePassword = new String(entryPassword);
+                } finally {
+                    Arrays.fill(entryPassword, '\0');
                 }
             }
 
@@ -195,5 +230,17 @@ public class UpdateCommand implements Callable<Integer> {
             throw new IllegalStateException("Console is unavailable. Run this command from a terminal.");
         }
         return console.readPassword("Type master password: ");
+    }
+
+    private char[] readEntryPassword() {
+        if (passwordReader != null) {
+            return passwordReader.readPassword("Type new entry password: ");
+        }
+
+        Console console = System.console();
+        if (console == null) {
+            throw new IllegalStateException("Console is unavailable. Run this command from a terminal.");
+        }
+        return console.readPassword("Type new entry password: ");
     }
 }

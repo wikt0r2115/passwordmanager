@@ -8,7 +8,7 @@
 - Password generation policy.
 - Vault envelope serialization.
 - KDF parameter validation.
-- Error mapping.
+- Exit-code and message mapping for CLI commands.
 
 ### Crypto Tests
 
@@ -17,46 +17,34 @@
 - Tampered ciphertext fails.
 - Tampered AAD fails.
 - Random salt/nonce changes between saves.
+- Invalid vault metadata fails before decrypt where possible.
 
-### Repository Tests
+### Storage Tests
 
 - Missing vault file.
-- Invalid JSON.
-- Atomic write behavior.
-- Storage failure keeps previous vault unchanged.
+- Existing vault is not overwritten by `init`.
+- Replace existing vault.
+- Backup creation is covered through mutating CLI flows.
 
 ### CLI Tests
 
-- `init` happy path.
-- `add`, `list`, `show`, `remove` flows.
-- EOF/interrupted input.
-- Wrong master password.
+- `init`, `add`, `list`, `show`, `update`, `remove`, `export`, `import`, `generate`.
+- Missing vault file without password prompt.
+- Missing password input.
+- Wrong master password without changing the vault.
 - Validation errors to stderr.
 - Non-zero exit codes for serious failures.
+- No-argument invocation prints usage.
 
-## Test Design Rule
-
-Production randomness must be injectable in tests.
-
-Do not make tests depend on fixed global `SecureRandom` output. Wrap randomness
-behind a small interface, then use deterministic test implementations.
-
-## CI Goal
-
-First CI workflow after implementation starts:
+## Current Test Command
 
 ```bash
 ./mvnw test
 ```
 
-Later:
+## Potential Additions
 
-```bash
-./mvnw verify
-```
-
-Potential additions:
-
-- dependency vulnerability scan,
-- static analysis,
-- formatting check.
+- Dependency vulnerability scan.
+- Static analysis.
+- Formatting check.
+- More filesystem failure simulation for backup/write edge cases.

@@ -17,15 +17,13 @@ public class VaultUnlockService {
         byte[] plaintext = null;
 
         try {
-            if (envelope == null) {
-                throw new IllegalArgumentException("Vault envelope cant be null");
-            }
             if (masterPassword == null) {
                 throw new IllegalArgumentException("Master password cant be null");
             }
             if (mapper == null) {
                 throw new IllegalArgumentException("ObjectMapper cant be null");
             }
+            VaultEnvelopeValidator.validate(envelope);
 
             byte[] salt = Base64.getDecoder().decode(envelope.kdf().salt());
             byte[] nonce = Base64.getDecoder().decode(envelope.cipher().nonce());
@@ -39,7 +37,11 @@ public class VaultUnlockService {
             AesGcmService aesGcmService = new AesGcmService();
             plaintext = aesGcmService.decrypt(key, nonce, ciphertextWithTag, aad);
 
-            return mapper.readValue(plaintext, VaultPayload.class);
+            VaultPayload payload = mapper.readValue(plaintext, VaultPayload.class);
+            if (payload == null || payload.entries() == null) {
+                throw new IOException("Vault payload entries are missing.");
+            }
+            return payload;
         } finally {
             if (masterPassword != null) {
                 Arrays.fill(masterPassword, '\0');

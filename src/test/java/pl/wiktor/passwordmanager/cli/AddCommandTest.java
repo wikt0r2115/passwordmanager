@@ -146,17 +146,48 @@ class AddCommandTest {
     }
 
     @Test
-    void shouldFailWhenNeitherPasswordNorGenerateProvided() throws Exception {
+    void shouldPromptForEntryPasswordWhenPasswordAndGenerateAreMissing() throws Exception {
         Path vaultPath = initializedVaultPath();
 
         int exitCode = executeQuietly(new AddCommand(
                 mapper,
                 vaultPath,
-                prompt -> "test-master-password".toCharArray()),
+                prompt -> {
+                    if (prompt.contains("entry password")) {
+                        return "prompted-secret".toCharArray();
+                    }
+                    return "test-master-password".toCharArray();
+                }),
                 "--name", "github",
                 "--username", "user@example.com");
 
+        VaultEnvelope savedEnvelope = new VaultStorage(mapper).read(vaultPath);
+        VaultPayload payload = new VaultUnlockService()
+                .unlock(savedEnvelope, "test-master-password".toCharArray(), mapper);
+        VaultEntry entry = payload.entries().getFirst();
+
+        assertEquals(0, exitCode);
+        assertEquals("prompted-secret", entry.password());
+    }
+
+    @Test
+    void shouldFailWhenPromptedEntryPasswordIsNotProvided() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        VaultEnvelope initialEnvelope = new VaultStorage(mapper).read(vaultPath);
+
+        int exitCode = executeQuietly(new AddCommand(
+                mapper,
+                vaultPath,
+                prompt -> prompt.contains("entry password")
+                        ? null
+                        : "test-master-password".toCharArray()),
+                "--name", "github",
+                "--username", "user@example.com");
+
+        VaultEnvelope envelopeAfterFailedAdd = new VaultStorage(mapper).read(vaultPath);
+
         assertEquals(1, exitCode);
+        assertEquals(initialEnvelope, envelopeAfterFailedAdd);
     }
 
     @Test

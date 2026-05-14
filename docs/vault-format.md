@@ -2,14 +2,13 @@
 
 ## Format Strategy
 
-The vault file is a JSON envelope with encrypted payload.
+The vault file is a JSON envelope with an encrypted payload.
 
-Only metadata required for decryption is stored in plaintext. Credential entries
-are inside the encrypted payload.
+Only metadata required for decryption is stored in plaintext. Credential entries are inside the encrypted payload.
 
 ## Plaintext Envelope
 
-Planned shape:
+Current V1 shape:
 
 ```json
 {
@@ -35,7 +34,7 @@ Planned shape:
 
 ## Encrypted Payload
 
-Planned plaintext before encryption:
+Plaintext before encryption:
 
 ```json
 {
@@ -54,45 +53,48 @@ Planned plaintext before encryption:
 }
 ```
 
-## AAD Plan
+## AAD
 
-AES-GCM should authenticate selected plaintext header fields as Additional
-Authenticated Data. This means tampering with the header causes decryption to
-fail.
-
-Initial AAD fields:
+AES-GCM authenticates selected plaintext header fields as Additional Authenticated Data:
 
 ```text
 format
 version
 kdf.name
-kdf.memoryKiB
-kdf.iterations
-kdf.parallelism
-kdf.salt
 cipher.name
-cipher.nonce
 cipher.tagLengthBits
 ```
 
-Before implementation, define a canonical serialization for AAD so tests can
-verify it deterministically.
+Other envelope fields are still validated before decrypt. Changes to KDF parameters, salt or nonce also prevent successful decryption because they affect key derivation or AES-GCM input.
+
+## Validation
+
+The loader rejects:
+
+- missing envelope,
+- unsupported format,
+- unsupported version,
+- missing KDF/cipher parameters,
+- unsupported KDF/cipher names,
+- invalid Base64,
+- invalid salt/nonce lengths,
+- unsupported tag length,
+- unreasonable Argon2 memory/iteration/parallelism values,
+- too-short payload.
 
 ## Versioning
 
 `version` starts at `1`.
 
-Future migrations must be explicit. The loader should reject unknown future
-versions with a clear message rather than guessing.
+Future migrations must be explicit. The loader rejects unknown future versions with a clear message rather than guessing.
 
 ## Corruption Handling
 
-The application should distinguish:
+The application distinguishes:
 
-- File missing.
-- Invalid JSON envelope.
-- Unsupported version.
-- Missing required fields.
-- Wrong master password or tampered encrypted data.
+- file missing,
+- invalid JSON envelope,
+- unsupported envelope metadata,
+- wrong master password or tampered encrypted data.
 
-User-facing messages should avoid leaking low-level crypto details.
+User-facing messages avoid leaking low-level crypto details.

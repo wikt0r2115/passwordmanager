@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for initial implementation, pending benchmark during coding.
+Accepted and implemented for V1.
 
 ## Context
 
@@ -51,3 +51,5 @@ Java has built-in AES-GCM support, and Bouncy Castle provides Argon2id support.
 - Every save must generate a fresh nonce.
 - Tests must cover tampering and wrong-password failures.
 - The project must document that it is not audited production security software.
+- The loader must validate envelope metadata before deriving a key so malformed
+  or unreasonable parameters fail cleanly.
