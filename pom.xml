@@ -5,7 +5,7 @@
 
   <groupId>pl.wiktor.passwordmanager</groupId>
   <artifactId>passwordmanager</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>1.0.0</version>
   <packaging>jar</packaging>
 
   <name>passwordmanager</name>
@@ -14,6 +14,7 @@
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.build.outputTimestamp>2026-10-10T00:00:00Z</project.build.outputTimestamp>
 
     <picocli.version>4.7.7</picocli.version>
     <jackson.version>2.21.3</jackson.version>

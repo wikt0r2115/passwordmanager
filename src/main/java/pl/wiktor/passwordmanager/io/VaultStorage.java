@@ -54,25 +54,25 @@ public class VaultStorage {
         if(!Files.exists(absoluteVaultPath))
             throw new NoSuchFileException("Vault is not initialized at " + absoluteVaultPath.toString());
 
-        Path backupPath = absoluteVaultPath.resolveSibling(absoluteVaultPath.getFileName().toString() + ".bak");
-        try {
-            Files.copy(absoluteVaultPath, backupPath, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            // Non-fatal error, we still want to try to save the new vault even if backup fails
-            System.err.println("Warning: Could not create vault backup: " + e.getMessage());
-        }
-
         Path tempFile = Files.createTempFile(vaultDirectory, absoluteVaultPath.getFileName().toString(), ".tmp");
         try {
             mapper.writeValue(tempFile.toFile(), vaultEnvelope);
-            Files.move(tempFile, absoluteVaultPath, 
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException | RuntimeException e) {
+            Path backupPath = absoluteVaultPath.resolveSibling(absoluteVaultPath.getFileName().toString() + ".bak");
+            Path backupTemp = Files.createTempFile(vaultDirectory, absoluteVaultPath.getFileName().toString(), ".bak.tmp");
+            try {
+                Files.copy(absoluteVaultPath, backupTemp, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(backupTemp, backupPath, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } finally {
+                Files.deleteIfExists(backupTemp);
+            }
+            moveReplacement(tempFile, absoluteVaultPath);
+        } finally {
             Files.deleteIfExists(tempFile);
-            throw e;
         }
+    }
 
-
+    protected void moveReplacement(Path source, Path destination) throws IOException {
+        Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 }

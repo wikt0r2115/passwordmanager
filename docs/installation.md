@@ -2,7 +2,13 @@
 
 This project is educational software. It is not professionally audited and is not a replacement for mature production password managers. Use it at your own risk.
 
-## Build First
+## Release archive (Java 21 or newer)
+
+Download `passwordmanager-1.0.0.zip` and `passwordmanager-1.0.0.zip.sha256` from the [GitHub release](https://github.com/wikt0r2115/passwordmanager/releases/tag/v1.0.0). On Linux, verify with `sha256sum -c passwordmanager-1.0.0.zip.sha256`; on macOS, use `shasum -a 256 -c passwordmanager-1.0.0.zip.sha256`. On Windows PowerShell compare `(Get-FileHash .\passwordmanager-1.0.0.zip -Algorithm SHA256).Hash.ToLower()` with the hash in the `.sha256` file. Extract the ZIP and run the launcher beside the JAR, from any working directory. The release archive includes the JAR, both launchers, license and READMEs. It does not need Maven.
+
+Linux/macOS: `unzip passwordmanager-1.0.0.zip` then `./passwordmanager-1.0.0/passwordmanager.sh --help`. Windows: `Expand-Archive .\passwordmanager-1.0.0.zip`, then `.\passwordmanager-1.0.0\passwordmanager.bat --help`. Run `init` from a real terminal to create the vault and set a master password. The program cannot read a password prompt from a non-interactive pipe.
+
+## Build from source
 
 From the repository root:
 
@@ -19,7 +25,7 @@ On Windows PowerShell:
 The launcher scripts use:
 
 ```text
-target/passwordmanager-0.1.0-SNAPSHOT.jar
+  passwordmanager-1.0.0.jar (release), or target/passwordmanager-1.0.0.jar (source checkout)
 ```
 
 Rebuild the project after code changes so the launcher runs the latest version.
@@ -141,7 +147,9 @@ Windows resolves `passwordmanager` to `passwordmanager.bat` through the default 
 
 ## Notes
 
-- The launcher points to the jar inside the repository `target/` directory.
-- Moving the repository requires recreating the symlink or updating `Path`.
+- The launcher first looks for the release JAR beside itself, then for the source-build JAR in `target/`.
+- Moving the archive or repository requires recreating a symlink or updating `Path` if you set one up.
 - The vault itself is stored separately at `~/.passwordmanager/vault.json`.
+- Successful writes keep the prior encrypted vault at `~/.passwordmanager/vault.json.bak`. Stop the CLI and copy the backup over `vault.json` to recover; keep the master password. See the README for exact commands.
+- A second concurrent writer exits with code 1. Do not delete `vault.json.lock` while commands may run.
 - Exported JSON files are plaintext and contain passwords. Treat them as sensitive data.

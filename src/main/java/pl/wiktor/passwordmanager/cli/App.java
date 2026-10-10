@@ -5,7 +5,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
-@Command(name = "passwordmanager", mixinStandardHelpOptions = true, version = "0.1.0", subcommands = {
+@Command(name = "passwordmanager", mixinStandardHelpOptions = true, version = "1.0.0", subcommands = {
         InitCommand.class,
         ListCommand.class,
         AddCommand.class,

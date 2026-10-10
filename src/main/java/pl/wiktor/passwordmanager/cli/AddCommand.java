@@ -18,6 +18,7 @@ import pl.wiktor.passwordmanager.error.VaultValidationException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
+import pl.wiktor.passwordmanager.io.VaultWriteLock;
 import pl.wiktor.passwordmanager.model.VaultEntry;
 import pl.wiktor.passwordmanager.model.VaultEnvelope;
 import pl.wiktor.passwordmanager.model.VaultPayload;
@@ -69,6 +70,15 @@ public class AddCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        try (VaultWriteLock ignored = VaultWriteLock.acquire(vaultPath)) {
+            return executeWithLock();
+        } catch (IOException e) {
+            System.err.println("Vault could not be locked: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private Integer executeWithLock() {
         if (password != null && generate) {
             System.err.println("Error: Please provide either --password or --generate, not both.");
             return 1;

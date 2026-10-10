@@ -15,72 +15,35 @@ Edukacyjny lokalny zaszyfrowany vault haseł zbudowany w Javie 21. Projekt jest 
 - Atomowy zapis vaulta i kopia `.bak` przed aktualizacją.
 - Maven, JUnit, GitHub Actions, fat jar i skrypty uruchomieniowe.
 
-## Szybki Start
+## Instalacja i pierwszy start
 
-Wymagania:
-
-- Java 21 lub nowsza
-- Maven jest opcjonalny, bo repozytorium zawiera Maven Wrapper
-
-Budowanie i uruchomienie z katalogu projektu:
-
-```bash
-./mvnw clean package
-./passwordmanager.sh --help
-```
-
-### Dodanie launchera do PATH
-
-Launchery zakładają, że projekt został wcześniej zbudowany przez `./mvnw clean package`.
+Zainstaluj Javę 21 lub nowszą. Pobierz `passwordmanager-1.0.0.zip` i plik `.sha256` z [wydania v1.0.0](https://github.com/wikt0r2115/passwordmanager/releases/tag/v1.0.0), sprawdź sumę i rozpakuj archiwum. Paczka nie wymaga instalacji Mavena.
 
 Linux:
 
 ```bash
-mkdir -p ~/.local/bin
-ln -sf "$(pwd)/passwordmanager.sh" ~/.local/bin/passwordmanager
+sha256sum -c passwordmanager-1.0.0.zip.sha256
+unzip passwordmanager-1.0.0.zip
+./passwordmanager-1.0.0/passwordmanager.sh --help
+./passwordmanager-1.0.0/passwordmanager.sh init
 ```
 
-Jeśli `~/.local/bin` nie jest w `PATH`, dodaj do `~/.bashrc` albo `~/.zshrc`:
+macOS: użyj `shasum -a 256 -c passwordmanager-1.0.0.zip.sha256`, a potem tych samych komend `unzip` i launchera. Windows PowerShell: porównaj `(Get-FileHash .\passwordmanager-1.0.0.zip -Algorithm SHA256).Hash.ToLower()` z sumą w `.sha256`, uruchom `Expand-Archive .\passwordmanager-1.0.0.zip`, a następnie `.\passwordmanager-1.0.0\passwordmanager.bat --help` i `init`.
 
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-macOS:
-
-```bash
-sudo ln -sf "$(pwd)/passwordmanager.sh" /usr/local/bin/passwordmanager
-```
-
-Windows PowerShell:
-
-```powershell
-$project = (Get-Location).Path
-[Environment]::SetEnvironmentVariable(
-  "Path",
-  [Environment]::GetEnvironmentVariable("Path", "User") + ";$project",
-  "User"
-)
-```
-
-Po otwarciu nowego terminala Windows uruchomi `passwordmanager` przez `passwordmanager.bat`.
-
-Pełniejsze instrukcje są w [docs/installation.md](docs/installation.md).
+CLI pyta o hasło master w prawdziwym terminalu. Budowa ze źródeł: `./mvnw clean package` (Windows: `.\mvnw.cmd clean package`), następnie launcher w katalogu repozytorium. Więcej w [instrukcji instalacji](docs/installation.md).
 
 ## Demo
 
 ![Demo terminala Password Manager CLI](docs/assets/passwordmanager-demo.gif)
 
-Flow do skopiowania:
+Scenariusz demo w katalogu rozpakowanej paczki (na osobnym koncie testowym):
 
 ```bash
-./mvnw clean package
 ./passwordmanager.sh init
 ./passwordmanager.sh add --name github --username user@example.com --url https://github.com
 ./passwordmanager.sh list
-./passwordmanager.sh show --name github
 ./passwordmanager.sh update --name github --prompt-password
-./passwordmanager.sh export --output backup.json
+./passwordmanager.sh show --name github
 ```
 
 Inicjalizacja vaulta:
@@ -144,8 +107,22 @@ Pliki eksportu są jawne i zawierają hasła. Traktuj je jak dane wrażliwe.
 - Koperta vaulta jest walidowana przed KDF: format, wersja, Base64, długości soli/nonce oraz limity parametrów Argon2.
 - AES-GCM AAD uwierzytelnia wybrane pola nagłówka: format, wersję, nazwę KDF, nazwę szyfru i długość tagu.
 - Parametry KDF, sól i nonce są jawne, bo są potrzebne do odszyfrowania. Dane wpisów są tylko w zaszyfrowanym payloadzie.
+- Komendy zapisujące trzymają wyłączną blokadę `vault.json.lock` od odczytu do zapisu. Druga komenda zapisująca kończy się kodem 1. Plik blokady może pozostać po wyjściu; nie usuwaj go, gdy komendy mogą działać. Odczyt w czasie zapisu widzi cały stary albo cały nowy vault.
+- Pomyślna aktualizacja najpierw tworzy `vault.json.bak` z poprzedniej zaszyfrowanej wersji, potem atomowo podmienia vault. Błąd tworzenia kopii lub podmiany pozostawia poprzedni vault. Rób też osobne kopie: `.bak` zawiera tylko stan sprzed ostatniego pomyślnego zapisu.
 - Lokalny CLI nie chroni przed malware, keyloggerami, screen capture ani uprzywilejowanym atakującym na tym samym komputerze.
 - To projekt edukacyjny używany na własną odpowiedzialność.
+
+## Odzyskiwanie
+
+Zaszyfrowany vault jest w `~/.passwordmanager/vault.json` (Windows: `%USERPROFILE%\.passwordmanager\vault.json`). Po pomyślnej aktualizacji poprzednia zaszyfrowana wersja jest w `vault.json.bak` obok niego. Kopia też wymaga hasła master. Zatrzymaj wszystkie komendy programu, skopiuj oba pliki w inne miejsce, podmień uszkodzony vault kopią i sprawdź `list`. Linux/macOS:
+
+```bash
+cp ~/.passwordmanager/vault.json ~/.passwordmanager/vault.json.failed
+cp ~/.passwordmanager/vault.json.bak ~/.passwordmanager/vault.json
+./passwordmanager.sh list
+```
+
+Windows PowerShell: `Copy-Item "$HOME\.passwordmanager\vault.json" "$HOME\.passwordmanager\vault.json.failed"`, potem `Copy-Item "$HOME\.passwordmanager\vault.json.bak" "$HOME\.passwordmanager\vault.json"` i `passwordmanager.bat list`. Błędne hasło master, uszkodzony vault i nieudany import nie uruchamiają zapisu. `.bak` nie pomoże po utracie obu plików ani po zapomnieniu hasła master. Eksport jest **jawny** i zawiera hasła wpisów: twórz go tylko w razie potrzeby i przechowuj albo usuwaj ostrożnie.
 
 ## Development
 
@@ -159,7 +136,7 @@ Fat jar:
 
 ```bash
 ./mvnw clean package
-java -jar target/passwordmanager-0.1.0-SNAPSHOT.jar --help
+java -jar target/passwordmanager-1.0.0.jar --help
 ```
 
 ## Stack

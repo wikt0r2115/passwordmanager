@@ -55,7 +55,7 @@ Status: done.
 
 ### Milestone 4: Hardening
 
-Status: mostly done for V1.
+Status: done for v1.0.
 
 - wrong password and tampering tests.
 - vault envelope validation.
@@ -68,11 +68,11 @@ Remaining future hardening:
 - POSIX owner-only file permissions for vault and backups.
 - dependency vulnerability scan.
 - static analysis.
-- more filesystem failure simulation.
+- deeper filesystem fault injection and crash recovery validation.
 
 ### Milestone 5: Portfolio Polish
 
-Status: done for V1, with optional polish still possible.
+Status: done for v1.0.
 
 - README.
 - Polish README.
@@ -81,9 +81,10 @@ Status: done for V1, with optional polish still possible.
 - CI workflow.
 - Maven Wrapper.
 - runnable fat jar and launcher scripts.
+- versioned release archive, checksums and platform smoke workflow.
 
 ## Explicit Stop Point
 
-Stop after V1 polish unless there is a strong reason to continue.
+The v1.0 feature scope is closed. See [release checks](release-checklist.md) for verification. Further hardening is optional and belongs to a later version.
 
 Do not expand into GUI, sync or browser extension in this project version.

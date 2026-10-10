@@ -154,6 +154,39 @@ class ImportCommandTest {
         assertFalse(passwordPrompted.get());
     }
 
+    @Test
+    void malformedJsonMustNotChangeExistingVault() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        byte[] before = Files.readAllBytes(vaultPath);
+        Path importPath = tempDir.resolve("broken.json");
+        Files.writeString(importPath, "{broken json");
+
+        CommandResult result = executeQuietly(new ImportCommand(mapper, vaultPath,
+                prompt -> "test-master-password".toCharArray()), "--input", importPath.toString());
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stderr().contains("Failed to read input file"));
+        assertTrue(java.util.Arrays.equals(before, Files.readAllBytes(vaultPath)));
+    }
+
+    @Test
+    void invalidEntryAfterDuplicateMustNotPartiallyImport() throws Exception {
+        Path vaultPath = initializedVaultPath();
+        byte[] before = Files.readAllBytes(vaultPath);
+        Path importPath = tempDir.resolve("partial.json");
+        Instant now = Instant.now();
+        VaultEntry valid = new VaultEntry("id-1", "valid", "user", "pass", null, null, now, now);
+        VaultEntry invalid = new VaultEntry("", "invalid", "user", "pass", null, null, now, now);
+        mapper.writeValue(importPath.toFile(), new VaultPayload(List.of(valid, invalid)));
+
+        CommandResult result = executeQuietly(new ImportCommand(mapper, vaultPath,
+                prompt -> "test-master-password".toCharArray()), "--input", importPath.toString());
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stderr().contains("non-blank IDs"));
+        assertTrue(java.util.Arrays.equals(before, Files.readAllBytes(vaultPath)));
+    }
+
     private Path initializedVaultPath() throws Exception {
         Path vaultPath = tempDir.resolve("vault.json");
         VaultEnvelope envelope = new VaultInitializationService()

@@ -3,13 +3,19 @@ package pl.wiktor.passwordmanager.io;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.FileSystems;
+import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -88,6 +94,56 @@ class VaultStorageTest {
 
         assertThrows(NoSuchFileException.class, () -> storage.writeReplace(vaultPath, testEnvelope()));
         assertTrue(Files.notExists(vaultPath));
+    }
+
+    @Test
+    void shouldKeepVaultWhenBackupCannotBeCreated() throws Exception {
+        Path vaultPath = tempDir.resolve("vault.json");
+        VaultStorage storage = new VaultStorage(mapper);
+        storage.writeNew(vaultPath, testEnvelope());
+        byte[] before = Files.readAllBytes(vaultPath);
+        Files.createDirectory(tempDir.resolve("vault.json.bak"));
+
+        assertThrows(IOException.class, () -> storage.writeReplace(vaultPath, replacementEnvelope()));
+        assertTrue(java.util.Arrays.equals(before, Files.readAllBytes(vaultPath)));
+    }
+
+    @Test
+    void shouldKeepVaultAndRecoverableBackupWhenReplacementFails() throws Exception {
+        Path vaultPath = tempDir.resolve("vault.json");
+        VaultStorage storage = new VaultStorage(mapper);
+        storage.writeNew(vaultPath, testEnvelope());
+        byte[] before = Files.readAllBytes(vaultPath);
+        VaultStorage failingStorage = new VaultStorage(mapper) {
+            @Override
+            protected void moveReplacement(Path source, Path destination) throws IOException {
+                throw new IOException("simulated atomic replacement failure");
+            }
+        };
+
+        assertThrows(IOException.class, () -> failingStorage.writeReplace(vaultPath, replacementEnvelope()));
+        assertTrue(java.util.Arrays.equals(before, Files.readAllBytes(vaultPath)));
+        assertTrue(java.util.Arrays.equals(before, Files.readAllBytes(tempDir.resolve("vault.json.bak"))));
+    }
+
+    @Test
+    void shouldKeepVaultWhenDirectoryIsNotWritable() throws Exception {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        Path directory = Files.createDirectory(tempDir.resolve("read-only"));
+        Path vaultPath = directory.resolve("vault.json");
+        VaultStorage storage = new VaultStorage(mapper);
+        storage.writeNew(vaultPath, testEnvelope());
+        byte[] before = Files.readAllBytes(vaultPath);
+        Set<PosixFilePermission> original = Files.getPosixFilePermissions(directory);
+        try {
+            Files.setPosixFilePermissions(directory, Set.of(
+                    PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE));
+            assumeFalse(Files.isWritable(directory));
+            assertThrows(IOException.class, () -> storage.writeReplace(vaultPath, replacementEnvelope()));
+            assertTrue(java.util.Arrays.equals(before, Files.readAllBytes(vaultPath)));
+        } finally {
+            Files.setPosixFilePermissions(directory, original);
+        }
     }
 
     private VaultEnvelope testEnvelope() {

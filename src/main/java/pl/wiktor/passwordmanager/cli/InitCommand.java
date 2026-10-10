@@ -14,6 +14,7 @@ import picocli.CommandLine.Command;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
+import pl.wiktor.passwordmanager.io.VaultWriteLock;
 import pl.wiktor.passwordmanager.model.VaultEnvelope;
 import pl.wiktor.passwordmanager.vault.VaultInitializationService;
 
@@ -39,6 +40,15 @@ public class InitCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        try (VaultWriteLock ignored = VaultWriteLock.acquire(vaultPath)) {
+            return executeWithLock();
+        } catch (IOException e) {
+            System.err.println("Vault could not be locked: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private Integer executeWithLock() {
         if (Files.exists(vaultPath)) {
             System.err.println("Vault already exists: " + vaultPath);
             return 2;

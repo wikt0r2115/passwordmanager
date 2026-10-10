@@ -18,6 +18,7 @@ import pl.wiktor.passwordmanager.error.VaultValidationException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
+import pl.wiktor.passwordmanager.io.VaultWriteLock;
 import pl.wiktor.passwordmanager.model.VaultEntry;
 import pl.wiktor.passwordmanager.model.VaultEnvelope;
 import pl.wiktor.passwordmanager.model.VaultPayload;
@@ -75,6 +76,15 @@ public class UpdateCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        try (VaultWriteLock ignored = VaultWriteLock.acquire(vaultPath)) {
+            return executeWithLock();
+        } catch (IOException e) {
+            System.err.println("Vault could not be locked: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private Integer executeWithLock() {
         if (newName == null && username == null && password == null && url == null && notes == null && !generate
                 && !promptPassword) {
             System.err.println("Error: Nothing to update. Provide at least one field to change, --generate or --prompt-password.");

@@ -16,6 +16,7 @@ import pl.wiktor.passwordmanager.error.VaultValidationException;
 import pl.wiktor.passwordmanager.io.ObjectMapperFactory;
 import pl.wiktor.passwordmanager.io.VaultPathResolver;
 import pl.wiktor.passwordmanager.io.VaultStorage;
+import pl.wiktor.passwordmanager.io.VaultWriteLock;
 import pl.wiktor.passwordmanager.model.VaultEnvelope;
 import pl.wiktor.passwordmanager.model.VaultPayload;
 import pl.wiktor.passwordmanager.vault.VaultEntryService;
@@ -48,6 +49,15 @@ public class ImportCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        try (VaultWriteLock ignored = VaultWriteLock.acquire(vaultPath)) {
+            return executeWithLock();
+        } catch (IOException e) {
+            System.err.println("Vault could not be locked: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private Integer executeWithLock() {
         if (!Files.exists(inputPath)) {
             System.err.println("Input file does not exist: " + inputPath);
             return 1;
