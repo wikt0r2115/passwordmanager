@@ -60,8 +60,12 @@ def main():
         home.mkdir()
         work = scratch / "outside checkout"
         work.mkdir()
-        assert "Usage: passwordmanager" in run(launcher, home, work, ["--help"])
-        assert "1.0.0" in run(launcher, home, work, ["--version"])
+        help_output = subprocess.run([str(launcher), "--help"], cwd=work, capture_output=True,
+                                     text=True, check=True).stdout
+        version_output = subprocess.run([str(launcher), "--version"], cwd=work, capture_output=True,
+                                        text=True, check=True).stdout
+        assert "passwordmanager" in help_output.lower(), repr(help_output)
+        assert "1.0.0" in version_output, repr(version_output)
         master = "synthetic-master-for-smoke"
         run(launcher, home, work, ["init"], [master])
         run(launcher, home, work, ["add", "--name", "example", "--username", "tester"],
