@@ -14,6 +14,7 @@ Edukacyjny lokalny zaszyfrowany vault haseł zbudowany w Javie 21. Projekt jest 
 - Eksport/import jawnego JSON do backupu albo migracji.
 - Atomowy zapis vaulta i kopia `.bak` przed aktualizacją.
 - Maven, JUnit, GitHub Actions, fat jar i skrypty uruchomieniowe.
+- Lokalne demo Docker Compose z trwałym wolumenem zaszyfrowanego sejfu.
 
 ## Instalacja i pierwszy start
 
@@ -32,7 +33,41 @@ macOS: użyj `shasum -a 256 -c passwordmanager-1.0.0.zip.sha256`, a potem tych s
 
 CLI pyta o hasło master w prawdziwym terminalu. Budowa ze źródeł: `./mvnw clean package` (Windows: `.\mvnw.cmd clean package`), następnie launcher w katalogu repozytorium. Więcej w [instrukcji instalacji](docs/installation.md).
 
-## Demo
+## Lokalne demo Docker
+
+Wymagany jest Docker Engine z Compose v2 lub Docker Desktop z kontenerami Linux.
+Sklonuj repozytorium i wykonaj polecenia z jego katalogu głównego w zwykłym terminalu
+(PowerShell, Terminal lub powłoka Linux). Java i Maven są częścią obrazu budującego.
+
+```bash
+docker compose build
+docker compose run --rm passwordmanager --help
+docker compose run --rm passwordmanager init
+docker compose run --rm passwordmanager add --name github --username user@example.com --url https://github.com
+docker compose run --rm passwordmanager list
+docker compose run --rm passwordmanager update --name github --prompt-password
+docker compose run --rm passwordmanager show --name github
+docker compose run --rm passwordmanager remove --name github
+```
+
+Hasło główne i hasło wpisu podajesz w ukrytym monicie; nie przekazuj ich potokiem
+ani nie wyłączaj TTY opcją `-T`. Polecenie `show` celowo wyświetla zapisane hasło wpisu.
+Każde polecenie działa w nowym kontenerze bez uprawnień roota i bez dostępu do sieci.
+Sejf i kopia `.bak` pozostają w nazwanym wolumenie Compose `vault`, montowanym
+w `/data/.passwordmanager`. Usunięcie kontenera przez `--rm` nie usuwa sejfu.
+Wolumen jest niezależny od `~/.passwordmanager` na komputerze. Korzystaj z tego
+samego katalogu projektu lub tej samej nazwy projektu Compose, aby otwierać ten
+sam wolumen. `init` wykonaj tylko raz dla danego wolumenu. **`docker compose down -v`
+usuwa sejf demonstracyjny razem z jego kopią.**
+
+Obraz powstaje z kodu źródłowego przy użyciu Javy 21 i Mavena 3.9.9; podczas
+budowania uruchamiane są testy JUnit. Workflow `Docker demo` w CI sprawdza też
+interaktywne polecenia, trwałość danych między kontenerami, tworzenie kopii oraz
+odrzucenie błędnego hasła głównego. W systemie Linux po zbudowaniu obrazu można
+uruchomić ten sam test przez `python3 scripts/smoke-docker.py`. Test korzysta
+z osobnego wolumenu testowego i usuwa go po zakończeniu.
+
+## Demo CLI
 
 ![Demo terminala Password Manager CLI](docs/assets/passwordmanager-demo.gif)
 
@@ -149,6 +184,7 @@ java -jar target/passwordmanager-1.0.0.jar --help
 - Bouncy Castle Argon2id
 - Java Cryptography Architecture AES-GCM
 - JUnit 5
+- Docker / Docker Compose
 
 ## Licencja
 

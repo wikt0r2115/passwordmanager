@@ -16,6 +16,7 @@ Educational local encrypted password vault built with Java 21. The project is a 
 - Plaintext JSON export/import for migration and backup workflows.
 - Atomic vault writes with `.bak` backup creation before updates.
 - Maven build, JUnit test suite, GitHub Actions workflow and runnable fat jar.
+- Local Docker Compose demo with a persistent encrypted vault volume.
 
 ## Install and first run
 
@@ -34,7 +35,40 @@ macOS: use `shasum -a 256 -c passwordmanager-1.0.0.zip.sha256`, then the same `u
 
 The CLI prompts for the master password in a real terminal. For source builds, run `./mvnw clean package` (Windows: `.\mvnw.cmd clean package`) and use the launcher in the repository root. See [installation details](docs/installation.md).
 
-## Demo
+## Local Docker demo
+
+Requires Docker Engine with Compose v2, or Docker Desktop running Linux containers.
+Clone this repository and run the following commands from its root in a real terminal
+(PowerShell, Terminal or a Linux shell). Java and Maven are included in the build image.
+
+```bash
+docker compose build
+docker compose run --rm passwordmanager --help
+docker compose run --rm passwordmanager init
+docker compose run --rm passwordmanager add --name github --username user@example.com --url https://github.com
+docker compose run --rm passwordmanager list
+docker compose run --rm passwordmanager update --name github --prompt-password
+docker compose run --rm passwordmanager show --name github
+docker compose run --rm passwordmanager remove --name github
+```
+
+The master and entry passwords are prompted without echo; do not pipe them into
+the command or disable the TTY with `-T`. `show` deliberately displays the stored
+entry password. Each command runs in a fresh, non-root container without network
+access. The encrypted vault and `.bak` backup stay in the Compose `vault` named
+volume at `/data/.passwordmanager`, so removing the container with `--rm` does not
+remove the vault. This volume is separate from your host's `~/.passwordmanager`.
+Keep using the same checkout directory (or the same Compose project name) to open
+the same volume. Run `init` only once for that volume. **`docker compose down -v`
+deletes the demo vault and its backup.**
+
+The image is built from source with Java 21 and Maven 3.9.9, and the build runs the
+JUnit suite. The `Docker demo` CI workflow also tests the real interactive commands,
+data persistence between containers, backup creation and an incorrect master password.
+On Linux, the same integration check can be run after the build with
+`python3 scripts/smoke-docker.py`; it uses an isolated test volume and removes it afterward.
+
+## CLI demo
 
 ![Password Manager CLI terminal demo](docs/assets/passwordmanager-demo.gif)
 
@@ -151,6 +185,7 @@ java -jar target/passwordmanager-1.0.0.jar --help
 - Bouncy Castle Argon2id
 - Java Cryptography Architecture AES-GCM
 - JUnit 5
+- Docker / Docker Compose
 
 ## License
 

@@ -1,0 +1,12 @@
+services:
+  passwordmanager:
+    image: passwordmanager:local
+    build: .
+    stdin_open: true
+    tty: true
+    network_mode: none
+    volumes:
+      - vault:/data/.passwordmanager
+
+volumes:
+  vault:

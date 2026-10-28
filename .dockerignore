@@ -1,0 +1,6 @@
+# Only build inputs enter the context; local vaults and other files stay outside.
+**
+!Dockerfile
+!pom.xml
+!src/
+!src/**
